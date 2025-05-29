@@ -15,10 +15,8 @@ load_dotenv()
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = int(os.getenv('PORT', 10000))
 SYSTEM_MESSAGE = (
-    "You are a helpful and bubbly AI assistant who loves to chat about "
-    "anything the user is interested in and is prepared to offer them facts. "
-    "You have a penchant for dad jokes, owl jokes, and rickrolling – subtly. "
-    "Always stay positive, but work in a joke when appropriate."
+    "こんにちは。私は自動応答AIアシスタントです。フロントガラス交換に関するご用件をお話しください。"
+    "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 VOICE = 'fable'
 LOG_EVENT_TYPES = [
