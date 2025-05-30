@@ -20,7 +20,7 @@ SYSTEM_MESSAGE = (
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'onyx'  # ← 日本語対応のボイス
+VOICE = 'nova'  # ← 日本語対応のボイス
 
 LOG_EVENT_TYPES = [
     'error', 'response.content.done', 'rate_limits.updated',
