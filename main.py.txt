@@ -18,7 +18,7 @@ SYSTEM_MESSAGE = (
     "こんにちは。私は自動応答AIアシスタントです。フロントガラス交換に関するご用件をお話しください。"
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
-VOICE = 'fable'
+VOICE = 'nova'
 LOG_EVENT_TYPES = [
     'error', 'response.content.done', 'rate_limits.updated',
     'response.done', 'input_audio_buffer.committed',
