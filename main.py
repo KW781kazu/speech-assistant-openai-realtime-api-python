@@ -6,30 +6,21 @@ import websockets
 from fastapi import FastAPI, WebSocket, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.websockets import WebSocketDisconnect
-from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
+from twilio.twiml.voice_response import VoiceResponse, Connect
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# 設定
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 PORT = int(os.getenv('PORT', 10000))
 
 SYSTEM_MESSAGE = (
-    "こんにちは。私は自動応答AIアシスタントです。フロントガラス交換に関するご用件をお話しください。"
+    "こんにちは。私は自動応答AIアシスタントです。"
+    "フロントガラス交換に関するご用件をお話しください。"
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'nova'  # ← 日本語対応のボイス
-
-LOG_EVENT_TYPES = [
-    'error', 'response.content.done', 'rate_limits.updated',
-    'response.done', 'input_audio_buffer.committed',
-    'input_audio_buffer.speech_stopped', 'input_audio_buffer.speech_started',
-    'session.created'
-]
-
-SHOW_TIMING_MATH = False
+VOICE = 'onyx'  # 日本語に自然に対応
 
 app = FastAPI()
 
@@ -69,7 +60,6 @@ async def handle_media_stream(websocket: WebSocket):
         latest_media_timestamp = 0
         last_assistant_item = None
         mark_queue = []
-        response_start_timestamp_twilio = None
 
         async def receive_from_twilio():
             nonlocal stream_sid, latest_media_timestamp
@@ -94,7 +84,7 @@ async def handle_media_stream(websocket: WebSocket):
                     await openai_ws.close()
 
         async def send_to_twilio():
-            nonlocal stream_sid, last_assistant_item, response_start_timestamp_twilio
+            nonlocal stream_sid, last_assistant_item
             try:
                 async for openai_message in openai_ws:
                     response = json.loads(openai_message)
@@ -110,9 +100,6 @@ async def handle_media_stream(websocket: WebSocket):
                             }
                         }
                         await websocket.send_json(audio_delta)
-
-                        if response_start_timestamp_twilio is None:
-                            response_start_timestamp_twilio = latest_media_timestamp
 
                         if response.get("item_id"):
                             last_assistant_item = response["item_id"]
@@ -148,6 +135,7 @@ async def initialize_session(openai_ws):
             "input_audio_format": "g711_ulaw",
             "output_audio_format": "g711_ulaw",
             "voice": VOICE,
+            "language": "ja",  # ← 明示的に日本語を指定
             "instructions": SYSTEM_MESSAGE,
             "modalities": ["text", "audio"],
             "temperature": 0.8
@@ -156,16 +144,15 @@ async def initialize_session(openai_ws):
     print("初期セッションを送信中…")
     await openai_ws.send(json.dumps(session_update))
 
-    # 初回の日本語応答を送信
     initial_conversation_item = {
         "type": "conversation.item.create",
         "item": {
             "type": "message",
-            "role": "assistant",  # ← AIが話すように修正
+            "role": "assistant",
             "content": [
                 {
                     "type": "input_text",
-                    "text": "こんにちは。こちらはAI音声アシスタントです。ご用件をどうぞ。"
+                    "text": "こんにちは。AI音声アシスタントです。フロントガラス交換について何でもお話しください。"
                 }
             ]
         }
