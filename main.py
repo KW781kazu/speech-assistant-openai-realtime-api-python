@@ -34,9 +34,11 @@ async def index_page():
 # HEAD リクエストにも対応
 @app.api_route("/incoming-call", methods=["GET", "POST", "HEAD"])
 async def handle_incoming_call(request: Request):
+    print("✅ Twilioからの着信を受信しました")
     response = VoiceResponse()
-    response.pause(length=1)
     response.say("通話をAIアシスタントに接続します。少々お待ちください。", language="ja-JP")
+    response.pause(length=1)
+    response.say("どうぞお話しください。", language="ja-JP")
     host = request.url.hostname
     connect = Connect()
     connect.stream(url=f"wss://{host}/media-stream")
