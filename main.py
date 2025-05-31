@@ -31,7 +31,8 @@ if not OPENAI_API_KEY:
 async def index_page():
     return {"message": "Twilio Media Stream Server is running!"}
 
-@app.api_route("/incoming-call", methods=["GET", "POST"])
+# HEAD リクエストにも対応
+@app.api_route("/incoming-call", methods=["GET", "POST", "HEAD"])
 async def handle_incoming_call(request: Request):
     response = VoiceResponse()
     response.pause(length=1)
@@ -135,7 +136,7 @@ async def initialize_session(openai_ws):
             "input_audio_format": "g711_ulaw",
             "output_audio_format": "g711_ulaw",
             "voice": VOICE,
-            "language": "ja",  # ← 明示的に日本語を指定
+            "language": "ja",
             "instructions": SYSTEM_MESSAGE,
             "modalities": ["text", "audio"],
             "temperature": 0.8
