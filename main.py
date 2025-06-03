@@ -20,7 +20,7 @@ SYSTEM_MESSAGE = (
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'onyx'  # 日本語に自然に対応
+VOICE = 'onyx'  # 日本語に自然に対応した OpenAI ボイス
 
 app = FastAPI()
 
@@ -31,14 +31,11 @@ if not OPENAI_API_KEY:
 async def index_page():
     return {"message": "Twilio Media Stream Server is running!"}
 
-# HEAD リクエストにも対応
 @app.api_route("/incoming-call", methods=["GET", "POST", "HEAD"])
 async def handle_incoming_call(request: Request):
-    print("✅ Twilioからの着信を受信しました")
     response = VoiceResponse()
-    response.say("通話をAIアシスタントに接続します。少々お待ちください。", language="ja-JP")
     response.pause(length=1)
-    response.say("どうぞお話しください。", language="ja-JP")
+    response.say("通話をAIアシスタントに接続します。少々お待ちください。", language="ja-JP")
     host = request.url.hostname
     connect = Connect()
     connect.stream(url=f"wss://{host}/media-stream")
@@ -47,7 +44,7 @@ async def handle_incoming_call(request: Request):
 
 @app.websocket("/media-stream")
 async def handle_media_stream(websocket: WebSocket):
-    print("クライアントが接続されました")
+    print("Twilio からの WebSocket 接続を受け付けました")  # ← ここが反映された変更点
     await websocket.accept()
 
     async with websockets.connect(
