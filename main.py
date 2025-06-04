@@ -20,7 +20,7 @@ SYSTEM_MESSAGE = (
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'onyx'
+VOICE = 'onyx'  # 日本語対応の OpenAI 音声
 
 app = FastAPI()
 
@@ -57,7 +57,6 @@ async def handle_media_stream(websocket: WebSocket):
             }
         ) as openai_ws:
             print("OpenAI WebSocket 接続成功！")
-
             await initialize_session(openai_ws)
 
             stream_sid = None
@@ -135,6 +134,7 @@ async def handle_media_stream(websocket: WebSocket):
         print(f"OpenAI WebSocket 接続に失敗: {e}")
 
 async def initialize_session(openai_ws):
+    print("初期セッションを送信中…")
     session_update = {
         "type": "session.update",
         "session": {
@@ -148,7 +148,6 @@ async def initialize_session(openai_ws):
             "temperature": 0.8
         }
     }
-    print("初期セッションを送信中…")
     await openai_ws.send(json.dumps(session_update))
 
     initial_conversation_item = {
