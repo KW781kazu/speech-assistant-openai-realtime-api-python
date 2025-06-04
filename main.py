@@ -20,7 +20,7 @@ SYSTEM_MESSAGE = (
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'onyx'  # 日本語対応の OpenAI 音声
+VOICE = 'onyx'
 
 app = FastAPI()
 
@@ -33,10 +33,14 @@ async def index_page():
 
 @app.api_route("/incoming-call", methods=["GET", "POST", "HEAD"])
 async def handle_incoming_call(request: Request):
+    print("\u260e Twilio からの通話リクエストを受信")
     response = VoiceResponse()
     response.pause(length=1)
     response.say("通話をAIアシスタントに接続します。少々お待ちください。", language="ja-JP")
-    host = request.url.hostname
+
+    # ホスト名を明示的に指定
+    host = "dian-hua-dui-ying-tesuto.onrender.com"
+
     connect = Connect()
     connect.stream(url=f"wss://{host}/media-stream")
     response.append(connect)
