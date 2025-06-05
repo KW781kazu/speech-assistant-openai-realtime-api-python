@@ -21,7 +21,7 @@ SYSTEM_MESSAGE = (
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'onyx'  # 日本語対応の OpenAI 音声
+VOICE = 'onyx'
 
 app = FastAPI()
 
@@ -53,7 +53,8 @@ async def handle_media_stream(websocket: WebSocket):
         async with websockets.connect(
             'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
             extra_headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}"
+                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "OpenAI-Beta": "openai-realtime"  # ✅ 正しいベータ識別ヘッダー
             }
         ) as openai_ws:
             print("OpenAI WebSocket 接続成功！")
