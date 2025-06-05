@@ -5,7 +5,7 @@ import asyncio
 import websockets
 import traceback
 from fastapi import FastAPI, WebSocket, Request
-from fastapi.responses import Response, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.websockets import WebSocketDisconnect
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from dotenv import load_dotenv
@@ -37,10 +37,11 @@ async def handle_incoming_call(request: Request):
     response = VoiceResponse()
     response.pause(length=1)
     response.say("通話をAIアシスタントに接続します。少々お待ちください。", language="ja-JP")
+    host = request.url.hostname
     connect = Connect()
-    connect.stream(url="wss://dian-hua-dui-ying-tesuto.onrender.com/media-stream")
+    connect.stream(url=f"wss://{host}/media-stream")
     response.append(connect)
-    return Response(content=str(response), media_type="application/xml")
+    return HTMLResponse(content=str(response), media_type="application/xml")
 
 @app.websocket("/media-stream")
 async def handle_media_stream(websocket: WebSocket):
@@ -50,10 +51,10 @@ async def handle_media_stream(websocket: WebSocket):
     try:
         print("OpenAI WebSocket に接続中…")
         async with websockets.connect(
-            'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
+            'wss://api.openai.com/v1/realtime',
             extra_headers={
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "OpenAI-Beta": "realtime-v1"
+                "OpenAI-Beta": "assistants=v2;realtime=v1"
             }
         ) as openai_ws:
             print("OpenAI WebSocket 接続成功！")
@@ -72,7 +73,7 @@ async def handle_media_stream(websocket: WebSocket):
                         if data['event'] == 'media' and openai_ws.open:
                             latest_media_timestamp = int(data['media']['timestamp'])
                             audio_append = {
-                                "type": "input_audio_buffer.append",
+                                "type": "input_audio",
                                 "audio": data['media']['payload']
                             }
                             await openai_ws.send(json.dumps(audio_append))
@@ -91,9 +92,9 @@ async def handle_media_stream(websocket: WebSocket):
                 try:
                     async for openai_message in openai_ws:
                         response = json.loads(openai_message)
-                        if response.get('type') == 'response.audio.delta' and 'delta' in response:
+                        if response.get('type') == 'audio' and 'audio' in response:
                             audio_payload = base64.b64encode(
-                                base64.b64decode(response['delta'])
+                                base64.b64decode(response['audio'])
                             ).decode('utf-8')
                             audio_delta = {
                                 "event": "media",
@@ -103,31 +104,9 @@ async def handle_media_stream(websocket: WebSocket):
                                 }
                             }
                             await websocket.send_json(audio_delta)
-
-                            if response.get("item_id"):
-                                last_assistant_item = response["item_id"]
-
-                            await send_mark(websocket, stream_sid)
-                        elif response.get("type") == "input_audio_buffer.speech_started":
-                            print("音声入力開始検出")
-                            if last_assistant_item:
-                                await handle_speech_started_event()
                 except Exception as e:
                     print(f"send_to_twilio エラー: {e}")
                     traceback.print_exc()
-
-            async def send_mark(connection, stream_sid):
-                if stream_sid:
-                    mark_event = {
-                        "event": "mark",
-                        "streamSid": stream_sid,
-                        "mark": {"name": "responsePart"}
-                    }
-                    await connection.send_json(mark_event)
-                    mark_queue.append("responsePart")
-
-            async def handle_speech_started_event():
-                print("音声中断検出")
 
             await asyncio.gather(receive_from_twilio(), send_to_twilio())
 
@@ -137,36 +116,19 @@ async def handle_media_stream(websocket: WebSocket):
 
 async def initialize_session(openai_ws):
     print("初期セッションを送信中…")
-    session_update = {
-        "type": "session.update",
+    session_create = {
+        "type": "session.create",
         "session": {
-            "turn_detection": {"type": "server_vad"},
-            "input_audio_format": "g711_ulaw",
-            "output_audio_format": "g711_ulaw",
+            "model": "gpt-4o",
             "voice": VOICE,
             "language": "ja",
             "instructions": SYSTEM_MESSAGE,
-            "modalities": ["text", "audio"],
-            "temperature": 0.8
+            "input_audio_format": "g711_ulaw",
+            "output_audio_format": "g711_ulaw",
+            "turn_detection": {"type": "server"}
         }
     }
-    await openai_ws.send(json.dumps(session_update))
-
-    initial_conversation_item = {
-        "type": "conversation.item.create",
-        "item": {
-            "type": "message",
-            "role": "assistant",
-            "content": [
-                {
-                    "type": "input_text",
-                    "text": "こんにちは。AI音声アシスタントです。フロントガラス交換について何でもお話しください。"
-                }
-            ]
-        }
-    }
-    await openai_ws.send(json.dumps(initial_conversation_item))
-    await openai_ws.send(json.dumps({"type": "response.create"}))
+    await openai_ws.send(json.dumps(session_create))
 
 if __name__ == "__main__":
     import uvicorn
