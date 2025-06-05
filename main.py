@@ -21,7 +21,7 @@ SYSTEM_MESSAGE = (
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'onyx'
+VOICE = 'onyx'  # 日本語対応の OpenAI 音声
 
 app = FastAPI()
 
@@ -51,10 +51,9 @@ async def handle_media_stream(websocket: WebSocket):
     try:
         print("OpenAI WebSocket に接続中…")
         async with websockets.connect(
-            'wss://api.openai.com/v1/realtime',
+            'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
             extra_headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "OpenAI-Beta": "assistants=v2;realtime=v1"
+                "Authorization": f"Bearer {OPENAI_API_KEY}"
             }
         ) as openai_ws:
             print("OpenAI WebSocket 接続成功！")
@@ -73,7 +72,7 @@ async def handle_media_stream(websocket: WebSocket):
                         if data['event'] == 'media' and openai_ws.open:
                             latest_media_timestamp = int(data['media']['timestamp'])
                             audio_append = {
-                                "type": "input_audio",
+                                "type": "input_audio_buffer.append",
                                 "audio": data['media']['payload']
                             }
                             await openai_ws.send(json.dumps(audio_append))
@@ -92,9 +91,9 @@ async def handle_media_stream(websocket: WebSocket):
                 try:
                     async for openai_message in openai_ws:
                         response = json.loads(openai_message)
-                        if response.get('type') == 'audio' and 'audio' in response:
+                        if response.get('type') == 'response.audio.delta' and 'delta' in response:
                             audio_payload = base64.b64encode(
-                                base64.b64decode(response['audio'])
+                                base64.b64decode(response['delta'])
                             ).decode('utf-8')
                             audio_delta = {
                                 "event": "media",
@@ -104,9 +103,31 @@ async def handle_media_stream(websocket: WebSocket):
                                 }
                             }
                             await websocket.send_json(audio_delta)
+
+                            if response.get("item_id"):
+                                last_assistant_item = response["item_id"]
+
+                            await send_mark(websocket, stream_sid)
+                        elif response.get("type") == "input_audio_buffer.speech_started":
+                            print("音声入力開始検出")
+                            if last_assistant_item:
+                                await handle_speech_started_event()
                 except Exception as e:
                     print(f"send_to_twilio エラー: {e}")
                     traceback.print_exc()
+
+            async def send_mark(connection, stream_sid):
+                if stream_sid:
+                    mark_event = {
+                        "event": "mark",
+                        "streamSid": stream_sid,
+                        "mark": {"name": "responsePart"}
+                    }
+                    await connection.send_json(mark_event)
+                    mark_queue.append("responsePart")
+
+            async def handle_speech_started_event():
+                print("音声中断検出")
 
             await asyncio.gather(receive_from_twilio(), send_to_twilio())
 
@@ -116,19 +137,36 @@ async def handle_media_stream(websocket: WebSocket):
 
 async def initialize_session(openai_ws):
     print("初期セッションを送信中…")
-    session_create = {
-        "type": "session.create",
+    session_update = {
+        "type": "session.update",
         "session": {
-            "model": "gpt-4o",
+            "turn_detection": {"type": "server_vad"},
+            "input_audio_format": "g711_ulaw",
+            "output_audio_format": "g711_ulaw",
             "voice": VOICE,
             "language": "ja",
             "instructions": SYSTEM_MESSAGE,
-            "input_audio_format": "g711_ulaw",
-            "output_audio_format": "g711_ulaw",
-            "turn_detection": {"type": "server"}
+            "modalities": ["text", "audio"],
+            "temperature": 0.8
         }
     }
-    await openai_ws.send(json.dumps(session_create))
+    await openai_ws.send(json.dumps(session_update))
+
+    initial_conversation_item = {
+        "type": "conversation.item.create",
+        "item": {
+            "type": "message",
+            "role": "assistant",
+            "content": [
+                {
+                    "type": "input_text",
+                    "text": "こんにちは。AI音声アシスタントです。フロントガラス交換について何でもお話しください。"
+                }
+            ]
+        }
+    }
+    await openai_ws.send(json.dumps(initial_conversation_item))
+    await openai_ws.send(json.dumps({"type": "response.create"}))
 
 if __name__ == "__main__":
     import uvicorn
