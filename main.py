@@ -5,7 +5,7 @@ import asyncio
 import websockets
 import traceback
 from fastapi import FastAPI, WebSocket, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import Response, JSONResponse
 from fastapi.websockets import WebSocketDisconnect
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from dotenv import load_dotenv
@@ -21,7 +21,7 @@ SYSTEM_MESSAGE = (
     "できるかぎり丁寧にお答えしますので、どうぞお話しください。"
 )
 
-VOICE = 'onyx'  # 日本語対応の OpenAI 音声
+VOICE = 'onyx'
 
 app = FastAPI()
 
@@ -37,11 +37,10 @@ async def handle_incoming_call(request: Request):
     response = VoiceResponse()
     response.pause(length=1)
     response.say("通話をAIアシスタントに接続します。少々お待ちください。", language="ja-JP")
-    host = request.url.hostname
     connect = Connect()
-    connect.stream(url=f"wss://{host}/media-stream")
+    connect.stream(url="wss://dian-hua-dui-ying-tesuto.onrender.com/media-stream")
     response.append(connect)
-    return HTMLResponse(content=str(response), media_type="application/xml")
+    return Response(content=str(response), media_type="application/xml")
 
 @app.websocket("/media-stream")
 async def handle_media_stream(websocket: WebSocket):
