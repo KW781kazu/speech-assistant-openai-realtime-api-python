@@ -54,24 +54,22 @@ async def handle_media_stream(websocket: WebSocket):
             'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
             extra_headers={
                 "Authorization": f"Bearer {OPENAI_API_KEY}",
-                "OpenAI-Beta": "openai-realtime"  # ✅ 正しいベータ識別ヘッダー
+                "OpenAI-Beta": "realtime-v1"
             }
         ) as openai_ws:
             print("OpenAI WebSocket 接続成功！")
             await initialize_session(openai_ws)
 
             stream_sid = None
-            latest_media_timestamp = 0
             last_assistant_item = None
             mark_queue = []
 
             async def receive_from_twilio():
-                nonlocal stream_sid, latest_media_timestamp
+                nonlocal stream_sid
                 try:
                     async for message in websocket.iter_text():
                         data = json.loads(message)
                         if data['event'] == 'media' and openai_ws.open:
-                            latest_media_timestamp = int(data['media']['timestamp'])
                             audio_append = {
                                 "type": "input_audio_buffer.append",
                                 "audio": data['media']['payload']
